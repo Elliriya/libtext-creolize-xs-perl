@@ -1,0 +1,679 @@
+=== eol
+--- input
+"\n \n\t\n"
+--- expected
+[['EOL', "\n"], ['EOL', "\n"], ['EOL', "\n"], ['EOF', '']]
+
+=== hrule just four dashes
+--- input
+"----\n"
+--- expected
+[['HRULE', "----\n"], ['EOF', '']]
+
+=== hrule blanks and four dashes
+--- input
+"   ----\n"
+--- expected
+[['HRULE', "----\n"], ['EOF', '']]
+
+=== hrule four dashes and blanks
+--- input
+" ----  \n"
+--- expected
+[['HRULE', "----  \n"], ['EOF', '']]
+
+=== hrule more four dashes
+--- input
+"------\n"
+--- expected
+[['HRULE', "------\n"], ['EOF', '']]
+
+=== hrule blanks and more four dashes
+--- input
+"   ------\n"
+--- expected
+[['HRULE', "------\n"], ['EOF', '']]
+
+=== hrule more four dashes and blanks
+--- input
+" ------  \n"
+--- expected
+[['HRULE', "------  \n"], ['EOF', '']]
+
+=== hrule and hrule and ...
+--- input
+ "----\n"
+."  ----   \n"
+."   ---------   \n"
+--- expected
+[['HRULE', "----\n"], ['HRULE', "----   \n"], ['HRULE', "---------   \n"], ['EOF', '']]
+
+=== less four dashes is text but hrule
+--- input
+"-- --\n"
+--- expected
+[['TEXT', "-- --"], ['EOL', "\n"], ['EOF', '']]
+
+=== four dashes with another, it will be TEXT
+--- input
+"---- ---- ----\n"
+--- expected
+[['TEXT', "---- ---- ----"], ['EOL', "\n"], ['EOF', '']]
+
+=== verbatim simple
+--- input
+ "{{{\n"
+."foo\n"
+."bar\n"
+."}}}\n"
+--- expected
+[['VERBATIM',
+ "{{{\n"
+."foo\n"
+."bar\n"
+."}}}\n"], ['EOF', '']]
+
+=== verbatim complex
+--- input
+ "{{{\n"
+."foo}}}\n"
+."{{{bar\n"
+." }}}\n"
+."}}} \n"
+."}}}\n"
+--- expected
+[['VERBATIM',
+ "{{{\n"
+."foo}}}\n"
+."{{{bar\n"
+." }}}\n"
+."}}} \n"
+."}}}\n"], ['EOF', '']]
+
+=== verbatim empty
+--- input
+ "{{{\n"
+."}}}\n"
+--- expected
+[['VERBATIM',
+ "{{{\n"
+."}}}\n"], ['EOF', '']]
+
+=== not verbatim but nowiki
+--- input
+ " {{{\n"
+."foo\n"
+."bar\n"
+."}}}\n"
+--- expected
+[['NOWIKI',
+ "{{{\n"
+."foo\n"
+."bar\n"
+."}}}"], ['EOL', "\n"], ['EOF', '']]
+
+=== not verbatim but complex nowikis and texts
+--- input
+ " {{{\n"
+."foo}}}\n"
+."{{{bar\n"
+." }}}\n"
+."}}} \n"
+."}}}\n"
+--- expected
+[['NOWIKI',"{{{\n"
+."foo}}}"], ['EOL', "\n"],
+ ['NOWIKI',"{{{bar\n"." }}}"], ['EOL', "\n"],
+ ['TEXT', "}}}"], ['EOL', " \n"],
+ ['TEXT', "}}}"], ['EOL', "\n"], ['EOF', '']]
+
+=== not verbatim but nowiki empty
+--- input
+ " {{{\n"
+."}}}\n"
+--- expected
+[['NOWIKI',
+ "{{{\n"
+."}}}"], ['EOL', "\n"], ['EOF', '']]
+
+=== nowiki
+--- input
+ " {{{{{{foo}}}}}}\n"
+--- expected
+[['NOWIKI', "{{{{{{foo}}}}}}"], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list 1
+--- input
+"* item\n"
+--- expected
+[['JUSTLIST', "*"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list blanks + 1
+--- input
+"    * item\n"
+--- expected
+[['JUSTLIST', "*"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list 2
+--- input
+"** item\n"
+--- expected
+[['MAYBELIST', "**"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list blanks + 2
+--- input
+"    ** item\n"
+--- expected
+[['MAYBELIST', "**"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list 3
+--- input
+"*** item\n"
+--- expected
+[['JUSTLIST', "***"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== unordered list blanks + 3
+--- input
+"    *** item\n"
+--- expected
+[['JUSTLIST', "***"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== star in text
+--- input
+"a * b\n"
+--- expected
+[['TEXT', 'a * b'], ['EOL', "\n"], ['EOF', '']]
+
+=== starstar in text
+--- input
+"a ** b\n"
+--- expected
+[['TEXT', 'a'], ['BLANK', ' '], ['PHRASE', '**'], ['BLANK', ' '], ['TEXT', 'b'], ['EOL', "\n"], ['EOF', '']]
+
+=== starstarstar in text
+--- input
+"a *** b\n"
+--- expected
+[['TEXT', 'a *** b'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list 1
+--- input
+"# item\n"
+--- expected
+[['JUSTLIST', "#"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list blanks + 1
+--- input
+"    # item\n"
+--- expected
+[['JUSTLIST', "#"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list 2
+--- input
+"## item\n"
+--- expected
+[['MAYBELIST', "##"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list blanks + 2
+--- input
+"    ## item\n"
+--- expected
+[['MAYBELIST', "##"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list 3
+--- input
+"### item\n"
+--- expected
+[['JUSTLIST', "###"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== ordered list blanks + 3
+--- input
+"    ### item\n"
+--- expected
+[['JUSTLIST', "###"], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== sharp in text
+--- input
+"a # b\n"
+--- expected
+[['TEXT', 'a # b'], ['EOL', "\n"], ['EOF', '']]
+
+=== sharpsharp in text
+--- input
+"a ## b\n"
+--- expected
+[['TEXT', 'a'], ['BLANK', ' '], ['PHRASE', '##'], ['BLANK', ' '], ['TEXT', 'b'], ['EOL', "\n"], ['EOF', '']]
+
+=== sharpsharpsharp in text
+--- input
+"a ### b\n"
+--- expected
+[['TEXT', 'a ### b'], ['EOL', "\n"], ['EOF', '']]
+
+=== term 1
+--- input
+"; item\n"
+--- expected
+[['TERM', ';'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== term blank + 1
+--- input
+"  ; item\n"
+--- expected
+[['TERM', ';'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== term 2
+--- input
+";; item\n"
+--- expected
+[['TERM', ';;'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== term 3
+--- input
+";;; item\n"
+--- expected
+[['TERM', ';;;'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== term 1 text
+--- input
+"; item ; text\n"
+--- expected
+[['TERM', ';'], ['BLANK', ' '], ['TEXT', 'item ; text'], ['EOL', "\n"], ['EOF', '']]
+
+=== term 1 semicolon text
+--- input
+"; ;item ; text\n"
+--- expected
+[['TERM', ';'], ['BLANK', ' '], ['TEXT', ';item ; text'], ['EOL', "\n"], ['EOF', '']]
+
+=== desc 1
+--- input
+": item\n"
+--- expected
+[['DESC', ':'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== desc blank + 1
+--- input
+"  : item\n"
+--- expected
+[['DESC', ':'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== desc 2
+--- input
+":: item\n"
+--- expected
+[['DESC', '::'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== desc 3
+--- input
+"::: item\n"
+--- expected
+[['DESC', ':::'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== desc 1 text
+--- input
+": item : text\n"
+--- expected
+[['DESC', ':'], ['BLANK', ' '],
+ ['TEXT', 'item'], ['BLANK', ' '],
+ ['DESC', ':'], ['BLANK', ' '], ['TEXT', 'text'], ['EOL', "\n"],
+ ['EOF', ''],
+]
+
+=== desc 1 colon text
+--- input
+": :item :: text\n"
+--- expected
+[['DESC', ':'], ['BLANK', ' '],
+ ['DESC', ':'], ['TEXT', 'item'], ['BLANK', ' '],
+ ['DESC', '::'], ['BLANK', ' '], ['TEXT', 'text'], ['EOL', "\n"],
+ ['EOF', ''],
+]
+
+=== quote 1
+--- input
+"> item\n"
+--- expected
+[['QUOTE', '>'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== quote blank + 1
+--- input
+"  > item\n"
+--- expected
+[['QUOTE', '>'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== quote 2
+--- input
+">> item\n"
+--- expected
+[['QUOTE', '>>'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== quote 3
+--- input
+">>> item\n"
+--- expected
+[['QUOTE', '>>>'], ['BLANK', ' '], ['TEXT', 'item'], ['EOL', "\n"], ['EOF', '']]
+
+=== quote 1 text
+--- input
+"> item > text\n"
+--- expected
+[['QUOTE', '>'], ['BLANK', ' '], ['TEXT', 'item > text'], ['EOL', "\n"], ['EOF', '']]
+
+=== quote 1 greater than text
+--- input
+"> >item > text\n"
+--- expected
+[['QUOTE', '>'], ['BLANK', ' '], ['TEXT', '>item > text'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 1
+--- input
+"= heading\n"
+--- expected
+[['HEADING', '='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 1 + blank
+--- input
+"    = heading\n"
+--- expected
+[['HEADING', '='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 2
+--- input
+"== heading\n"
+--- expected
+[['HEADING', '=='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 2 + blank
+--- input
+"    == heading\n"
+--- expected
+[['HEADING', '=='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 3
+--- input
+"=== heading\n"
+--- expected
+[['HEADING', '==='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 10
+--- input
+"========== heading\n"
+--- expected
+[['HEADING', '=========='], ['BLANK', ' '], ['TEXT', 'heading'], ['EOL', "\n"],
+ ['EOF', ''],
+]
+
+=== heading 1 + endheading
+--- input
+"= heading =\n"
+--- expected
+[['HEADING', '='], ['BLANK', ' '], ['TEXT', 'heading'],
+ ['BLANK', ' '], ['HEADING', '='], ['EOL', "\n"], ['EOF', '']]
+
+=== heading 1 + endheading + blank
+--- input
+"= heading ==== \n"
+--- expected
+[['HEADING', '='], ['BLANK', ' '], ['TEXT', 'heading'],
+ ['BLANK', ' '], ['HEADING', '===='], ['EOL', " \n"], ['EOF', '']]
+
+=== heading 1 + text + endheading
+--- input
+"= head === ing =\n"
+--- expected
+[['HEADING', '='], ['BLANK', ' '], ['TEXT', 'head === ing'], ['BLANK', ' '],
+ ['HEADING', '='], ['EOL', "\n"], ['EOF', '']]
+
+=== table data
+--- input
+"|td\n"
+--- expected
+[['TD', '|'], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data blank
+--- input
+" |td\n"
+--- expected
+[['TD', '|'], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data blank blank
+--- input
+" | td\n"
+--- expected
+[['TD', '|'], ['BLANK', ' '], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data
+--- input
+"td|td\n"
+--- expected
+[['TEXT', 'td'], ['TD', '|'], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data blank
+--- input
+"td |td\n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '], ['TD', '|'], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data blank blank
+--- input
+"td | td\n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '],
+ ['TD', '|'], ['BLANK', ' '], ['TEXT', 'td'], ['EOL', "\n"], ['EOF', '']]
+
+=== table data 2
+--- input
+"||td||td\n"
+--- expected
+[['TD', '|'], ['TD', '|'], ['TEXT', 'td'],
+ ['TD', '|'], ['TD', '|'], ['TEXT', 'td'], ['EOL', "\n"],
+ ['EOF', '']]
+
+=== table header
+--- input
+"|=th\n"
+--- expected
+[['TD', '|='], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table header blank
+--- input
+" |=th\n"
+--- expected
+[['TD', '|='], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table header blank blank
+--- input
+" |= th\n"
+--- expected
+[['TD', '|='], ['BLANK', ' '], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table header
+--- input
+"td|=th\n"
+--- expected
+[['TEXT', 'td'], ['TD', '|='], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table header blank
+--- input
+"td |=th\n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '], ['TD', '|='], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table header blank blank
+--- input
+"td |= th\n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '],
+ ['TD', '|='], ['BLANK', ' '], ['TEXT', 'th'], ['EOL', "\n"], ['EOF', '']]
+
+=== table endtr
+--- input
+"td|\n"
+--- expected
+[['TEXT', 'td'], ['ENDTR', '|'], ['EOL', "\n"], ['EOF', '']]
+
+=== table blank endtr
+--- input
+"td |\n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '], ['ENDTR', '|'], ['EOL', "\n"], ['EOF', '']]
+
+=== table endtr blank
+--- input
+"td| \n"
+--- expected
+[['TEXT', 'td'], ['ENDTR', '|'], ['EOL', " \n"], ['EOF', '']]
+
+=== table blank endtr blank
+--- input
+"td | \n"
+--- expected
+[['TEXT', 'td'], ['BLANK', ' '], ['ENDTR', '|'], ['EOL', " \n"], ['EOF', '']]
+
+=== phrase
+--- input
+"//^^,,__\n"
+--- expected
+[['PHRASE', '//'], ['PHRASE', '^^'], ['PHRASE', ',,'], ['PHRASE', '__'], ['EOL', "\n"], ['EOF', '']]
+
+=== not phrase
+--- input
+"/a/^b^,c,_d_\n"
+--- expected
+[['TEXT', '/a/^b^,c,_d_'], ['EOL', "\n"], ['EOF', '']]
+
+=== not phrase 2
+--- input
+"///a///^^^b^^^,,,c,,,___d___\n"
+--- expected
+[['PHRASE', '//'], ['TEXT', '/a'], ['PHRASE', '//'], ['TEXT', '/'],
+ ['PHRASE', '^^'], ['TEXT', '^b'], ['PHRASE', '^^'], ['TEXT', '^'],
+ ['PHRASE', ',,'], ['TEXT', ',c'], ['PHRASE', ',,'], ['TEXT', ','],
+ ['PHRASE', '__'], ['TEXT', '_d'], ['PHRASE', '__'], ['TEXT', '_'],
+ ['EOL', "\n"], ['EOF', ''],
+]
+
+=== break
+--- input
+"a\\\\\\\\b\n"
+--- expected
+[['TEXT', 'a'], ['BREAK', "\\\\"], ['BREAK', "\\\\"], ['TEXT', 'b'], ['EOL', "\n"], ['EOF', '']]
+
+=== bracketed
+--- input
+"[[http://foo|bar]]\n"
+--- expected
+[['BRACKETED', '[[http://foo|bar]]'], ['EOL', "\n"], ['EOF', '']]
+
+=== not bracketed
+--- input
+"[foo[[[bar[[baz]a]\n"
+--- expected
+[['TEXT', '[foo[[[bar[[baz]a]'], ['EOL', "\n"], ['EOF', '']]
+
+=== braced
+--- input
+"{{http://foo|bar}}\n"
+--- expected
+[['BRACED', '{{http://foo|bar}}'], ['EOL', "\n"], ['EOF', '']]
+
+=== not bracketed
+--- input
+"{bar{{baz}a}\n"
+--- expected
+[['TEXT', '{bar{{baz}a}'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape one char
+--- input
+"~abc\n"
+--- expected
+[['ESCAPE', '~a'], ['TEXT', 'bc'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape tilde
+--- input
+"~~abc\n"
+--- expected
+[['ESCAPE', '~~'], ['TEXT', 'abc'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape tilde one char
+--- input
+"~~~abc\n"
+--- expected
+[['ESCAPE', '~~'], ['ESCAPE', '~a'], ['TEXT', 'bc'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape symbols
+--- input
+"~****~####~////~\\\\\\\\~^^^^~,,,,~____~::::~====~<<<<~[[[[~{{{{\n"
+--- expected
+[['ESCAPE', '~****'], ['ESCAPE', '~####'], ['ESCAPE', '~////'],
+ ['ESCAPE', '~\\\\'], ['BREAK', '\\\\'], ['ESCAPE', '~^^^^'], ['ESCAPE', '~,,,,'],
+ ['ESCAPE', '~____'], ['ESCAPE', '~::::'], ['ESCAPE', '~===='], ['ESCAPE', '~<<<<'],
+ ['ESCAPE', '~[[[['], ['ESCAPE', '~{{{{'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape bracketed
+--- input
+"~[[http://foo|bar]]\n"
+--- expected
+[['ESCAPE', '~[[http://foo|bar]]'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape bracketed 2
+--- input
+"~[[[http://foo|bar]]\n"
+--- expected
+[['ESCAPE', '~[[['], ['FREESTAND', 'http://foo'], ['TD' ,'|'], ['TEXT', 'bar]]'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape braced
+--- input
+"~{{http://foo|bar}}\n"
+--- expected
+[['ESCAPE', '~{{http://foo|bar}}'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape braced 2
+--- input
+"~{{http://foo|bar\n"
+--- expected
+[['ESCAPE', '~{{'], ['FREESTAND', 'http://foo'], ['TD' ,'|'], ['TEXT', 'bar'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape nowiki
+--- input
+"~{{{{{foo}}}}}\n"
+--- expected
+[['ESCAPE', '~{{{{{'], ['TEXT', 'foo}}}}}'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape url
+--- input
+"~http://example.net/wiki\n"
+--- expected
+[['ESCAPE', '~http://example.net/wiki'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape url punct
+--- input
+"~http://example.net/wiki.\n"
+--- expected
+[['ESCAPE', '~http://example.net/wiki'], ['TEXT', '.'], ['EOL', "\n"], ['EOF', '']]
+
+=== escape camelwords
+--- input
+"~WikiWikiWeb\n"
+--- expected
+[['ESCAPE', '~WikiWikiWeb'], ['EOL', "\n"], ['EOF', '']]
+
+=== url
+--- input
+"http://example.net/wiki\n"
+--- expected
+[['FREESTAND', 'http://example.net/wiki'], ['EOL', "\n"], ['EOF', '']]
+
+=== url punct
+--- input
+"http://example.net/wiki.\n"
+--- expected
+[['FREESTAND', 'http://example.net/wiki'], ['TEXT', '.'], ['EOL', "\n"], ['EOF', '']]
+
+=== camelwords
+--- input
+"WikiWikiWeb\n"
+--- expected
+[['FREESTAND', 'WikiWikiWeb'], ['EOL', "\n"], ['EOF', '']]
+

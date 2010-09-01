@@ -1,0 +1,7 @@
+Revision history for Perl extension Text::CreolizeXs.
+
+0.001 Wed Sep  1 11:51:01 2010
+    - branch from Text-Creolize-0.010.
+    - subst lexical scanner perl code to XSUB.
+    - subst generators put, puts, put_raw, put_xml, _put_markup to XSUB.
+
