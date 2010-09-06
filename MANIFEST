@@ -18,4 +18,6 @@ t/12.listadditions.t
 t/13.larsch.t
 t/20.heading.t
 t/21.leak.t
+t/22.pholder.t
+t/23.plugin.t
 t/lexspec

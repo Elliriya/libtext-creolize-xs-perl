@@ -5,7 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-use version; our $VERSION = '0.001';
+# $Id: Xs.pm,v 0.002 2010/09/06 00:23:25Z tociyuki Exp $
+use version; our $VERSION = '0.002';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -61,7 +62,7 @@ my %MARKUP = (
     q{__} => {stag => q{<span class="underline">}, etag => q{</span>}},
     q{\\\\} =>   {tag => qq{<br />\n}},
     q{nowiki} => {stag => q{<code>}, etag => q{</code>}},
-    q{<<<} => {stag => q{<span class="placeholder"}, etag => q{</span>}},
+    q{<<<} => {stag => q{<span class="placeholder">}, etag => q{</span>}},
     q{toc} => {stag => qq{<div class="toc">\n}, etag => qq{</div>\n}},
 );
 my @BASE36 = ('0' .. '9', 'a' .. 'z');
@@ -480,8 +481,9 @@ sub _insert_escaped {
 # placeholders: "<<< ... >>>"
 sub _insert_placeholder {
     my($self, $data) = @_;
+    my($body) = $data =~ m{\A<<<(.*)>>>\z}mosx;
     $self->_put_markup(q{<<<}, 'stag');
-    $self->put($data);
+    $self->put_xml($body);
     $self->_put_markup(q{<<<}, 'etag');
     return $self;
 }
@@ -492,7 +494,8 @@ sub _insert_plugin {
     if (! $self->{plugin_run}) { # avoid infinite recursive calls
         local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
         my $visitor = $self->{plugin_visitor} || $self;
-        $visitor->visit_plugin($data, $self);
+        my($body) = $data =~ m{\A<<$S*(.*?)$S*>>\z}mosx;
+        $visitor->visit_plugin($body, $self);
     }
     return $self;
 }
@@ -572,7 +575,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.001
+0.002
 
 =head1 SYNOPSIS
 
