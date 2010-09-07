@@ -504,44 +504,65 @@ creolize_scan(creolize_t *self)
 MODULE = Text::Creolize::Xs		PACKAGE = Text::Creolize::Xs		
 
 void
-_scan(SV * self_sv, SV * src_sv)
-  PROTOTYPE: $$
+_xs_alloc(SV *self_sv)
+  PROTOTYPE: $
   PREINIT:
-    creolize_t self;
+    creolize_t *self;
     HV *self_hv;
     SV **p_result;
     SV *self_iv;
   CODE:
     if (! sv_isobject(self_sv) || SvTYPE(SvRV(self_sv)) != SVt_PVHV)
-        croak("_xs_scan: $self is not blessed HASHREF!");
-    self.instance = self_sv;
-
-    self.source = SvPV(src_sv, self.size);
-    self.pos = 0;
-    self.utf8 = DO_UTF8(src_sv);
-
+        croak("_xs_alloc: $self is not blessed HASHREF!");
+    Newx(self, 1, creolize_t);
     self_hv = (HV *)SvRV(self_sv);
     if (! hv_exists(self_hv, "result", 6)) {
         hv_store(self_hv, "result", 6, newSVpvn("", 0), 0);
     }
     p_result = hv_fetch(self_hv, "result", 6, FALSE);
     if (p_result == NULL || ! SvPOK(*p_result))
-        croak("_scan: $self->{result} is not SCALAR");
-    self.result = *p_result;
-    self.wtype = WTYPE_NULL;
-    self.blank = FALSE;
-
-    SvGROW(self.result, (self.size + 64)); 
-
-    self_iv = newSViv(PTR2IV(&self));
+        croak("_xs_alloc: $self->{result} is not SCALAR");
+    self->result = *p_result;
+    self->wtype = WTYPE_NULL;
+    self->blank = FALSE;
+    self_iv = newSViv(PTR2IV(self));
     sv_magic(SvRV(self_sv), sv_2mortal(self_iv), PERL_MAGIC_ext, NULL, 0);
 
-    creolize_scan(&self);
-
+void
+_xs_free(SV *self_sv)
+  PROTOTYPE: $
+  PREINIT:
+    creolize_t *self;
+    MAGIC *mg;
+  CODE:
+    mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
+    if (mg == NULL)
+        XSRETURN_EMPTY;
+    self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     sv_unmagic(SvRV(self_sv), PERL_MAGIC_ext);
+    Safefree(self);
 
-    if (SvUTF8(src_sv) && ! SvUTF8(self.result))
-        SvUTF8_on(self.result);
+void
+_scan(SV * self_sv, SV * src_sv)
+  PROTOTYPE: $$
+  PREINIT:
+    creolize_t *self;
+    MAGIC *mg;
+  CODE:
+    if (! sv_isobject(self_sv) || SvTYPE(SvRV(self_sv)) != SVt_PVHV)
+        croak("_scan: $self is not blessed HASHREF!");
+    mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
+    if (mg == NULL)
+        croak("_scan: forgot _xs_alloc!");
+    self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
+    self->instance = self_sv;
+    self->source = SvPV(src_sv, self->size);
+    self->pos = 0;
+    self->utf8 = DO_UTF8(src_sv);
+    SvGROW(self->result, (self->size + 64)); 
+    creolize_scan(self);
+    if (SvUTF8(src_sv) && ! SvUTF8(self->result))
+        SvUTF8_on(self->result);
 
 void
 match(SV * klass, SV * srcsv)

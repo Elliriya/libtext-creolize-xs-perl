@@ -20,4 +20,5 @@ t/20.heading.t
 t/21.leak.t
 t/22.pholder.t
 t/23.plugin.t
+t/24.toc.t
 t/lexspec

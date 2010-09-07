@@ -1,5 +1,10 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.003  Tue Sep  7 03:03:49 2010
+    + t/24.toc.t
+    + ADD: _xs_alloc, _xs_free, DESTROY for toc support.
+    ! modify _scan.
+
 0.002  Mon Sep  6 00:23:08 2010 UTC
     ! FIX: broken stag for placeholder.
     ! FIX: strip needless mark /<<</ and />>>/ in placeholders.

@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.002 2010/09/06 00:23:25Z tociyuki Exp $
-use version; our $VERSION = '0.002';
+# $Id: Xs.pm,v 0.003 2010/09/07 03:03:49Z tociyuki Exp $
+use version; our $VERSION = '0.003';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -83,7 +83,14 @@ sub new {
     my($class, @arg) = @_;
     my $self = bless {}, $class;
     $self->_init(@arg);
+    $self->_xs_alloc;
     return $self;
+}
+
+sub DESTROY {
+    my($self) = @_;
+    $self->_xs_free;
+    return;
 }
 
 sub script_name { return shift->_attr(script_name => @_) }
@@ -99,7 +106,6 @@ sub convert {
     $wiki_source =~ s/(?:\r\n?|\n)/\n/gmosx;
     chomp $wiki_source;
     $wiki_source .= "\n";
-    $self->{result} = q{}; # and clear
     $self->_scan($wiki_source);
     if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
         my $toc = $self->_list_toc->result;
@@ -575,7 +581,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.002
+0.003
 
 =head1 SYNOPSIS
 
