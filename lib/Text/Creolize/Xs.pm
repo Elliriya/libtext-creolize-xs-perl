@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.003 2010/09/07 03:03:49Z tociyuki Exp $
-use version; our $VERSION = '0.003';
+# $Id: Xs.pm,v 0.004 2010/09/08 03:14:52Z tociyuki Exp $
+use version; our $VERSION = '0.004';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -253,7 +253,8 @@ sub _insert_hr { return shift->_put_markup(q{----}, 'tag') }
 sub _start_h {
     my($self, $data) = @_;
     ($self->{heading}) = $data =~ /\A(={1,6})/mosx;
-    $self->{heading_pos} = length $self->{result};
+    # why does utf8::length $self->{result} return always zero?
+    $self->{heading_bytes_pos} = bytes::length $self->{result};
     return $self->_start_block($self->{heading});
 }
 
@@ -262,9 +263,12 @@ sub _end_h {
     my $mark = delete $self->{heading};
     $self->_end_block($mark);
     return $self if ! defined $self->{toc};
-    my $p = index $self->{result}, q{<h}, $self->{heading_pos};
+    my $p = bytes::index $self->{result}, q{<h}, $self->{heading_bytes_pos};
     return $self if $p < 0;
-    my $text = substr $self->{result}, $self->{heading_pos};
+    my $text = bytes::substr $self->{result}, $p;
+    if (utf8::is_utf8($self->{result}) && ! utf8::is_utf8($text)) {
+        utf8::decode($text);
+    }
     chomp $text;
     $text =~ s/<.*?>//gmosx;
     return $self if ! $text;
@@ -581,7 +585,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.003
+0.004
 
 =head1 SYNOPSIS
 

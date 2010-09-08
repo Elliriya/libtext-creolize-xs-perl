@@ -460,6 +460,7 @@ static void
 creolize_scan(creolize_t *self)
 {
     int state, succ, token, i, j;
+    SV *data;
 
     for (state = 0; state >= 0; state = succ) {
         creolize_match(self);
@@ -484,10 +485,12 @@ creolize_scan(creolize_t *self)
                     SAVETMPS;
                     PUSHMARK(SP);
                     XPUSHs(self->instance);
-                    XPUSHs(sv_2mortal(newSVpvn(
+                    data = newSVpvn_utf8(
                         self->source + self->pos_start,
-                        self->pos_end - self->pos_start
-                    )));
+                        self->pos_end - self->pos_start,
+                        SvUTF8(self->result)
+                    );
+                    XPUSHs(sv_2mortal(data));
                     PUTBACK;
 
                     call_method(LEX_ACTION[j], G_SCALAR);
@@ -559,10 +562,10 @@ _scan(SV * self_sv, SV * src_sv)
     self->source = SvPV(src_sv, self->size);
     self->pos = 0;
     self->utf8 = DO_UTF8(src_sv);
-    SvGROW(self->result, (self->size + 64)); 
-    creolize_scan(self);
     if (SvUTF8(src_sv) && ! SvUTF8(self->result))
         SvUTF8_on(self->result);
+    SvGROW(self->result, (self->size + 64)); 
+    creolize_scan(self);
 
 void
 match(SV * klass, SV * srcsv)
@@ -628,6 +631,8 @@ put(SV *self_sv, SV *data)
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     data_body = SvPV(data, data_size);
     creolize_put_text(self, data_body, data_size);
+    if (SvUTF8(data) && ! SvUTF8(self->result))
+        SvUTF8_on(self->result);
 
 void
 puts(SV *self_sv, SV *data)
@@ -660,6 +665,8 @@ put_xml(SV *self_sv, SV *data)
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     data_body = SvPV(data, data_size);
     creolize_put_xml(self, data_body, data_size);
+    if (SvUTF8(data) && ! SvUTF8(self->result))
+        SvUTF8_on(self->result);
 
 void
 put_raw(SV *self_sv, SV *data)
@@ -677,6 +684,8 @@ put_raw(SV *self_sv, SV *data)
     sv_catsv(self->result, data);
     self->blank = FALSE;
     self->wtype = WTYPE_TEXT;
+    if (SvUTF8(data) && ! SvUTF8(self->result))
+        SvUTF8_on(self->result);
 
 void
 _put_markup_string(SV *self_sv, SV *markup_string, SV *markup_type)

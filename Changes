@@ -1,6 +1,9 @@
 Revision history for Perl extension Text::CreolizeXs.
 
-0.003  Tue Sep  7 03:03:49 2010
+0.004  Wed Sep  8 03:14:52 2010 UTC
+    ! FIX: broken encoding utf-8 string in table of content.
+
+0.003  Tue Sep  7 03:03:49 2010 UTC
     + t/24.toc.t
     + ADD: _xs_alloc, _xs_free, DESTROY for toc support.
     ! modify _scan.
@@ -12,7 +15,7 @@ Revision history for Perl extension Text::CreolizeXs.
     + t/22.pholder.t
     + t/23.plugin.t
 
-0.001  Wed Sep  1 11:51:01 2010
+0.001  Wed Sep  1 11:51:01 2010 UTC
     - branch from Text-Creolize-0.010.
     - subst lexical scanner perl code to XSUB.
     - subst generators put, puts, put_raw, put_xml, _put_markup to XSUB.
