@@ -23,3 +23,8 @@ t/23.plugin.t
 t/24.toc.t
 t/25.encoded.t
 t/lexspec
+t/30.perled-link.t
+t/31.perled-creole10test.t
+tx/perlcritic.t
+tx/pod-coverage.t
+tx/pod.t

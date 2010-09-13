@@ -1,5 +1,15 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.005  Mon Sep 13 12:46:41 2010 UTC
+    + ADD type property.
+    + ADD escape_quote function.
+    + ADD generating perl source code, when type => 'perl'.
+    + t/30.perled-link.t
+    + t/31.perled-creole10test.t
+    + tx/perlcritic.t
+    + tx/pod.t
+    + tx/pod-coverage.t
+
 0.004  Wed Sep  8 03:14:52 2010 UTC
     ! FIX: broken encoding utf-8 string in table of content.
 

@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.004 2010/09/08 03:14:52Z tociyuki Exp $
-use version; our $VERSION = '0.004';
+# $Id: Xs.pm,v 0.005 2010/09/13 12:46:41Z tociyuki Exp $
+use version; our $VERSION = '0.005';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -100,16 +100,28 @@ sub plugin_visitor { return shift->_attr(plugin_visitor => @_) }
 sub result { return shift->_attr(result => @_) }
 sub toc { return shift->_attr(toc => @_) }
 sub tocinfo { return shift->_attr(tocinfo => @_) }
+sub type { return shift->_attr(type => @_) }
 
 sub convert {
     my($self, $wiki_source) = @_;
-    $wiki_source =~ s/(?:\r\n?|\n)/\n/gmosx;
+    $wiki_source =~ s/(?:\r\n?|\n)/\x0a/gmosx;
     chomp $wiki_source;
-    $wiki_source .= "\n";
+    $wiki_source .= "\x0a";
+    $self->{type} ||= 'xhtml';
     $self->_scan($wiki_source);
     if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
         my $toc = $self->_list_toc->result;
         $self->{result} = $toc . $self->{result};
+    }
+    if ($self->{type} eq 'perl') {
+        ## no critic qw(Interpolation)
+        $self->{result} = "sub{\n"
+            . "my(\$v) = \@_;\n"
+            . "use utf8;\n"
+            . "my \$t = '';\n"
+            . "\$t .= '" . $self->{result} . "';\n"
+            . "return \$t;\n"
+            . "}\n";
     }
     return $self;
 }
@@ -124,11 +136,12 @@ sub _init {
         static_location => 'http://www.example.net/static/',
         result => q{},
         tocinfo => [],
+        type => 'xhtml',
     );
     my $opt = ref $arg[0] eq 'HASH' && @arg == 1 ? $arg[0] : {@arg};
     for my $k (qw(
         script_name static_location
-        link_visitor plugin_visitor markup_visitor toc
+        link_visitor plugin_visitor markup_visitor toc type
     )) {
         next if ! exists $opt->{$k};
         $self->{$k} = $opt->{$k};
@@ -147,27 +160,41 @@ sub _attr {
 # VISITORS
 # $hash_anchor = $creolize->link_visitor->visit_link($link, $title, $creolize);
 sub visit_link {
-    my($self, $link, $title, $builder) = @_;
-    return if $link =~ /script:/imosx;
+    my($self, $link, $text, $builder) = @_;
+    my $anchor = {};
+    return $anchor if $link =~ /script:/imosx;
     if ($link !~ m{\A(?:(?:https?|ftps?)://|\#)}mosx) {
+        if ($builder->type eq 'perl') {
+            $anchor->{runtime} = 'yes';
+        }
         $link = $builder->script_name . $link;
     }
-    return {href => $link};
+    $anchor->{href} = $link;
+    $anchor->{text} = defined $text ? $text : $link;
+    return $anchor;
 }
 
 # $hash_image = $creolize->link_visitor->visit_image($link, $title, $creolize);
 sub visit_image {
     my($self, $link, $title, $builder) = @_;
+    my $image = {};
     if ($link !~ m{\Ahttps?://}mosx) {
         $link = $builder->static_location . $link;
     }
-    return {src => $link, alt => $title};
+    $image->{src} = $link;
+    $image->{alt} = defined $title ? $title : q{};
+    return $image;
 }
 
-# $src = $creolize->plugin_visitor->visit_plugin($data, $creolize);
+# $hash_plugin = $creolize->plugin_visitor->visit_plugin($data, $creolize);
 sub visit_plugin {
     my($self, $data, $builder) = @_;
-    return $self;
+    my $plugin = {};
+    if ($builder->type eq 'perl') {
+        $plugin->{runtime} = 'yes';
+    }
+    $plugin->{text} = q{};
+    return $plugin;
 }
 
 # GENERATORS
@@ -225,6 +252,12 @@ sub escape_name {
     }
     $name =~ s{([^a-zA-Z0-9_.\-:/])}{ sprintf "%%%02X", ord($1) }msxge;
     return $name;
+}
+
+sub escape_quote {
+    my($self, $data) = @_;
+    $data =~ s{'}{\\'}gmosx;
+    return $data;
 }
 
 sub hash_base36 {
@@ -501,36 +534,80 @@ sub _insert_placeholder {
 # plugin calls: "<< ... >>"
 sub _insert_plugin {
     my($self, $data) = @_;
-    if (! $self->{plugin_run}) { # avoid infinite recursive calls
-        local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
-        my $visitor = $self->{plugin_visitor} || $self;
-        my($body) = $data =~ m{\A<<$S*(.*?)$S*>>\z}mosx;
-        $visitor->visit_plugin($body, $self);
+    return $self if $self->{plugin_run}; # avoid recursive calls
+    local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
+    my $visitor = $self->{plugin_visitor} || $self;
+    my($source) = $data =~ m{\A<<$S*(.*?)$S*>>\z}mosx;
+    my $plugin = $visitor->visit_plugin($source, $self);
+    if ($plugin && $plugin->{runtime}) {
+        ## no critic qw(Interpolation)
+        my $proc= q{$v->_build_plugin($v->visit_plugin('}
+            . $self->escape_quote($source)
+            . q{',$v))};
+        $self->put_raw(qq{';\n\$t .= $proc;\n\$t .= '});
+    }
+    else {
+        $self->put_raw($self->_build_plugin($plugin));
     }
     return $self;
 }
 
+sub _build_plugin {
+    my($self, $plugin) = @_;
+    return defined $plugin->{content} ? $plugin->{content}
+        : defined $plugin->{text} ? $self->escape_text($plugin->{text})
+        : defined $plugin->{xml} ? $self->escape_xml($plugin->{xml})
+        : q{};
+}
+
 # links: "[[ url | description ]]"
 sub _insert_bracketed {
-    my($self, $data) = @_;
-    if ($data =~ /\A\[\[$S*([^\|]*?)$S*(?:\|$S*(.*?)$S*)?\]\]\z/mosx) {
-        return $self->_insert_link($data, $1, ! defined $2 ? $1 : $2);
+    my($self, $source) = @_;
+    if ($source =~ /\A\[\[$S*([^\|]*?)$S*(?:\|$S*(.*?)$S*)?\]\]\z/mosx) {
+        return $self->_insert_link($source, $1, defined $2 ? $2 : $1);
     }
-    return $self->put($data);
+    return $self->put($source);
 }
 
 # freestand links: url and CamelCased wiki words
 sub _insert_freestand {
-    my($self, $data) = @_;
-    return $self->_insert_link($data, $data, $data);
+    my($self, $link) = @_;
+    return $self->_insert_link($link, $link, $link);
 }
 
 sub _insert_link {
-    my($self, $data, $link, $title) = @_;
+    my($self, $source, $link, $text) = @_;
     my $visitor = $self->{link_visitor} || $self;
-    my $anchor = $visitor->visit_link($link, $title, $self);
-    if (! $anchor || (! $anchor->{name} && ! $anchor->{href})) {
-        return $self->put($data);
+    my $anchor = $visitor->visit_link($link, $text, $self);
+    if ($anchor && $self->type eq 'perl' && $anchor->{runtime}) {
+        ## no critic qw(Interpolation)
+        my $proc = q{$v->_build_a_element(}
+            . q{'} . $self->escape_quote($source) . q{',}
+            . q{$v->visit_link(}
+                . q{'} . $self->escape_quote($link) . q{',}
+                . q{'} . $self->escape_quote($text) . q{',}
+                . q{$v}
+            . q{)}
+        . q{)};
+        $self->put_raw(qq{';\n\$t .= $proc;\n\$t .= '});
+    }
+    elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
+        $self->put_raw($self->_build_a_element($source, $anchor));
+    }
+    else {
+        $self->put($source);
+    }
+    return $self;
+}
+
+sub _build_a_element {
+    my($self, $source, $anchor) = @_;
+    if (! $anchor->{href} && ! $anchor->{name}) {
+        return $self->escape_xml($source);
+    }
+    my $t = q{};
+    if (exists $anchor->{before}) {
+        $t .= $anchor->{before};
     }
     my $attr = q{};
     if (my $href = $anchor->{href}) {
@@ -540,23 +617,18 @@ sub _insert_link {
         next if ! $anchor->{$k};
         $attr .= qq{ $k="} . $self->escape_text($anchor->{$k}) . q{"};
     }
-    if (exists $anchor->{before}) {
-        $self->put_raw($anchor->{before});
-    }
-    $self->put_raw(qq{<a$attr>});
-    $self->put(exists $anchor->{data} ? $anchor->{data} : $title);
-    $self->put_raw(q{</a>});
+    $t .= qq{<a$attr>} . $self->escape_text($anchor->{text}) . q{</a>};
     if (exists $anchor->{after}) {
-        $self->put_raw($anchor->{after});
+        $t .= $anchor->{after};
     }
-    return $self;
+    return $t;
 }
 
 # images: "{{ url | description }}"
 sub _insert_braced {
     my($self, $data) = @_;
     if ($data =~ /\A\{\{$S*([^\|]*?)$S*(?:\|$S*(.*?)$S*)?\}\}\z/mosx) {
-        my($link, $title) = ($1, ! defined $2 ? $1 : $2);
+        my($link, $title) = ($1, $2);
         my $visitor = $self->{link_visitor} || $self;
         my $image = $visitor->visit_image($link, $title, $self);
         if (! $image || ! $image->{src}) {
@@ -564,7 +636,7 @@ sub _insert_braced {
         }
         my $attr = q{ src="} . $self->escape_uri($image->{src}) . q{"};
         for my $k (qw(id class alt title)) {
-            next if ! $image->{$k};
+            next if ! defined $image->{$k};
             $attr .= qq{ $k="} . $self->escape_text($image->{$k}) . q{"};
         }
         $self->put_raw(qq{<img$attr />});
@@ -585,7 +657,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.004
+0.005
 
 =head1 SYNOPSIS
 
@@ -598,6 +670,10 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
     $source = decode('UTF-8', $source);
     my $xhtml = Text::Creolize::Xs->new->convert($source)->result;
     print encode('UTF-8', $xhtml);
+
+    my $perlsrc = Text::Creolize::Xs->new({type => 'perl'})->convert($source)->result;
+    $cache->set('key' => encode('UTF-8', $perlsrc));
+    $xhtml = (eval $perlsrc)->(Text::Creolize::Xs->new);
 
 =head1 DESCRIPTION
 
@@ -673,21 +749,67 @@ Calculates the hash value of the given string.
 
 Gets a converted result. It's utf8 flag will be turned on.
 
-=item C<< $link_visitor->visit_link($link, $title, $builder) >>
+=item C<< $anchor = $link_visitor->visit_link($link, $title, $builder) >>
 
 The visitor's hook when the converter catches a href link.
+The return value must be a hash reference
+C<< @{$anchor}{qw(href name title rev rel id class before after runtime)} >>.
 
-=item C<< $link_visitor->visit_image($link, $title, $builder) >>
+=over
+
+=item C<< $anchor->{href} >>
+
+the url of the href attribute in the anchor element.
+href or name is required.
+
+=item C<< $anchor->{name} >>
+
+the value of the name attribute in the anchor element.
+href or name is required.
+
+=item C<< $anchor->{title} >>
+
+the optional value of the title attribute in the anchor element.
+
+=item C<< $anchor->{rev} >>
+
+the optional value of the rev attribute in the anchor element.
+
+=item C<< $anchor->{rel} >>
+
+the optional value of the rel attribute in the anchor element.
+
+=item C<< $anchor->{id} >>
+
+the optional value of the id attribute in the anchor element.
+
+=item C<< $anchor->{class} >>
+
+the optional value of the class attribute in the anchor element.
+
+=item C<< $anchor->{before} >>
+
+the optional xhtml markup put before the anchor element.
+
+=item C<< $anchor->{after} >>
+
+the optional xhtml markup put after the anchor element.
+
+=item C<< $anchor->{runtime} >>
+
+the optional boolean runtime redering flag.
+
+=back
+
+=item C<< $image = $link_visitor->visit_image($link, $title, $builder) >>
 
 The visitor's hook when the converter catches a image link.
+This must return a hash reference C<< @{$image}{qw(src id class alt title)} >>.
 
-=item C<< $plugin_visitor->visit_plugin($data, $builder) >>
+=item C<< $plugin = $plugin_visitor->visit_plugin($data, $builder) >>
 
 The visitor's hook when the converter catches a plugin.
-
-=item C<< $markup_visitor->visit_markup($mark, $type, $builder) >>
-
-The visitor's hook when the converter catches a markup.
+This must return a hash reference C<< @{$plugin}{qw(runtime text xml content)} >>.
 
 =item C<< $string = $creolize->escape_text($string) >>
 
@@ -705,11 +827,20 @@ Encode URI with parcent encoded.
 
 Encode URI with parcent encoded for a name part.
 
+=item C<< $string = $creolize->escape_quote($string) >>
+
+Escape single quote with a backslash mark in the given string.
+
 =back
 
 =head1 LIMITATION
 
 Cannot recognize double bracketted arrow links.
+
+=head1 REPOSITORY
+
+You can git-clone latest sources from
+L<http://github.com/tociyuki/libtext-creolize-xs-perl>
 
 =head1 DEPENDENCIES
 
