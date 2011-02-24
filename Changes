@@ -1,5 +1,8 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.006  Thu Feb 24 05:55:48 2011 UTC
+    + ADD escape character '\\'.
+
 0.005  Mon Sep 13 12:46:41 2010 UTC
     + ADD type property.
     + ADD escape_quote function.

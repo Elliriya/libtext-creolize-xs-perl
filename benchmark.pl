@@ -6,11 +6,13 @@ use Text::Creolize;
 use Text::WikiCreole ();
 
 my $wiki_source = do{local $/ = undef; <DATA> };
-
-my $r = timethese(400, {
+my $creolize = Text::Creolize::Xs->new(type => 'perl');
+my $perl = $creolize->convert($wiki_source)->result;
+my $r = timethese(1000, {
     'WikiCreole' => sub{ Text::WikiCreole::creole_parse($wiki_source) },
     'Creolize' => sub { Text::Creolize->new->convert($wiki_source) },
     'Creolize::Xs' => sub { Text::Creolize::Xs->new->convert($wiki_source) },
+    'CreolizePl' => sub { (eval $perl)->($creolize) },
 });
 cmpthese($r);
 

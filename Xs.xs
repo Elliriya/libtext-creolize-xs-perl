@@ -16,14 +16,16 @@ enum {
     WTYPE_TEXT = 1,
     WTYPE_STAG = 2,
     WTYPE_ETAG = 3,
-    WTYPE_ATAG = 4,
+    WTYPE_ATAG = 4
 };
 
-static const char *XML_SPECIAL[] = {"&amp;", "&lt;", "&gt;", "&quot;", "&#39;"};
+static const char *XML_SPECIAL[] = {
+    "&amp;", "&lt;", "&gt;", "&quot;", "&#39;", "&#92;"
+};
 
 typedef struct {
     SV *instance;       /* instance a cache of perl's $self */
-    U8* source;         /* source input C string of source */
+    U8 *source;         /* source input C string of source */
     STRLEN size;        /* size input C string length of source */
     int utf8;           /* utf8 input utf8 flag */
     STRLEN pos;         /* pos input \G position in bytes */
@@ -46,7 +48,7 @@ static void creolize_put_markup(creolize_t *, const U8 *, const STRLEN, int);
 /**
  * substitutes XML special characters in buffer (U8 * s, STRLEN size).
  * substitutued results are appended into SV *result.
- * XML special characters are four marks: '&', '<', '>', and '\''.
+ * XML special characters are four marks: '&', '<', '>', '\'', and '\\'.
  * This subroutine changes behaviour for named or number entities
  * with pass_entity switch. If it is ESCAPE_XML_ALL, all '&' marks
  * are escaped. If the pass_entity is ESCAPE_XML_TEXT, '&' marks
@@ -66,7 +68,7 @@ sv_cat_escape_xml(SV *result, const U8 *s, const STRLEN size, const int pass_ent
 
     /*
      *  s =~ s{
-     *      (   [<>"']
+     *      (   [<>"'\\]
      *      |   &
      *  # if ESCAPE_XML_TEXT
      *          (?: (?: [A-Za-z_][A-Za-z0-9_]{,62}
@@ -82,6 +84,7 @@ sv_cat_escape_xml(SV *result, const U8 *s, const STRLEN size, const int pass_ent
      *      : $1 eq q{>} ? q{&gt;}
      *      : $1 eq q{"} ? q{&quot;}
      *      : $1 eq q{'} ? q{&#39;}
+     *      : $1 eq q{\\} ? q{&#92;}
      *      : $1
      *  }gcmosx;
      *  result .= s;
@@ -89,15 +92,17 @@ sv_cat_escape_xml(SV *result, const U8 *s, const STRLEN size, const int pass_ent
     SvGROW(result, (SvCUR(result) + size + 8)); 
     pos_from = 0;
     while (pos_from < size) {
-        /* from state 7, '&amp;' -> '&amp;'
-         * from state 14, '&amp;' -> '&amp;amp;'
-         */ 
-        state = pass_entity ? 7 : 14;
+        /* from state 100, '&amp;' -> '&amp;'
+         * from state 101, '&amp;' -> '&amp;amp;'
+         */
+        state = pass_entity ? 100 : 101;
         pos = pos_from;
         while (pos < size) {
             ch = s[pos];
-            if (state == 7) {
-                if (ch == '<')
+            if (state == 100) {
+                if (ch == '&')
+                    state = 300;
+                else if (ch == '<')
                     state = 1;
                 else if (ch == '>')
                     state = 2;
@@ -105,78 +110,82 @@ sv_cat_escape_xml(SV *result, const U8 *s, const STRLEN size, const int pass_ent
                     state = 3;
                 else if (ch == '\'')
                     state = 4;
-                else if (ch == '&')
-                    state = 8;
-                else
+                else if (ch == '\\')
                     state = 5;
+                else
+                    state = 200;
             }
-            else if (state == 14) {
-                if (ch == '<')
-                    state = 1;
-                else if (ch == '>')
-                    state = 2;
-                else if (ch == '"')
-                    state = 3;
-                else if (ch == '\'')
-                    state = 4;
-                else if (ch == '&')
+            else if (state == 101) {
+                if (ch == '&')
                     state = 0;
-                else
+                else if (ch == '<')
+                    state = 1;
+                else if (ch == '>')
+                    state = 2;
+                else if (ch == '"')
+                    state = 3;
+                else if (ch == '\'')
+                    state = 4;
+                else if (ch == '\\')
                     state = 5;
+                else
+                    state = 200;
             }
-            else if (state == 5) {
-                if (ch == '<' || ch == '>' || ch == '"' || ch == '\'' || ch == '&')
+            else if (state == 200) {
+                if (ch == '<' || ch == '>' || ch == '"' || ch == '\''
+                    || ch == '&' || ch == '\\'
+                )
                     break;
             }
-            else if (state == 8) {
+            else if (state == 300) {
                 if ((isascii(ch) && isalpha(ch)) || ch == '_')
-                    state = 9;
+                    state = 301;
                 else if (ch == '#')
-                    state = 10;
+                    state = 302;
                 else
                     break;
             }
-            else if (state == 9) {
+            else if (state == 301) {
                 if (pos - pos_from > 65)
                     break;
                 if ((isascii(ch) && isalnum(ch)) || ch == '_')
-                    state = 9;
+                    state = 301;
                 else if (ch == ';')
-                    state = 6;
+                    state = 200;
                 else
                     break;
             }
-            else if (state == 10) {
+            else if (state == 302) {
                 if (isascii(ch) && isdigit(ch))
-                    state = 11;
+                    state = 303;
                 else if (ch == 'x')
-                    state = 12;
+                    state = 304;
                 else
                     break;
             }
-            else if (state == 11) {
+            else if (state == 303) {
                 if (pos - pos_from > 12)
                     break;
                 if (isascii(ch) && isdigit(ch))
-                    state = 11;
+                    state = 303;
                 else if (ch == ';')
-                    state = 6;
+                    state = 200;
                 else
                     break;
             }
-            else if (state == 12) {
+            else if (state == 304) {
                 if (isascii(ch) && isxdigit(ch))
-                    state = 13;
+                    state = 305;
                 else
                     break;
             }
-            else if (state == 13) {
+            else if (state == 305) {
                 if (pos - pos_from > 12)
                     break;
                 if (isascii(ch) && isxdigit(ch))
-                    state = 13;
+                    state = 305;
                 else if (ch == ';')
-                    state = 6;
+                    state = 200;
                 else
                     break;
             }
@@ -185,12 +194,12 @@ sv_cat_escape_xml(SV *result, const U8 *s, const STRLEN size, const int pass_ent
             }
             ++pos;
         }
-        if (state > 6) {
+        if (state >= 300) {
             /* the case of malformed entity, '&X' -> '&amp;X' */
             pos = pos_from + 1;
             state = 0;
         }
-        if (state <= 4)
+        if (state <= 5)
             sv_catpv(result, (char *)XML_SPECIAL[state]);
         else if (pos_from < pos)
             sv_catpvn(result, s + pos_from, pos - pos_from);
@@ -456,6 +465,15 @@ creolize_put_markup(creolize_t *self, const U8 *str, const STRLEN size, int wtyp
     self->wtype = wtype == WTYPE_ETAG ? WTYPE_ETAG : WTYPE_STAG;
 }
 
+/**
+ * scans the given WikiCreole text and calls suitable actions.
+ * This method is a main loop of the parser in Text::Creolize::Xs.
+ * Most of actions are written by perl script in that perl module.
+ * The states table, LEX_GRAMMAR, and the action table, LEX_ACTION
+ * are auto generated by perl script lex/gengrammar.pl.
+ *
+ * @param self the instance.
+ */
 static void
 creolize_scan(creolize_t *self)
 {
@@ -585,8 +603,8 @@ match(SV * klass, SV * srcsv)
         mg->mg_len = 0;
     }
     self.pos = mg->mg_len;
-    /* Since mg_find may realloc the PV structure,
-       we call SvPV after mg_find */
+    /* Since sv_magicext may realloc the PV structure,
+       we call SvPV after calling it. */
     self.source = SvPV(srcsv, self.size);
     self.utf8 = DO_UTF8(srcsv);
 
@@ -627,7 +645,7 @@ put(SV *self_sv, SV *data)
   CODE:
     mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
     if (mg == NULL)
-        croak("put: called out of context in _xs_scan.");
+        croak("put: forgot _xs_alloc!");
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     data_body = SvPV(data, data_size);
     creolize_put_text(self, data_body, data_size);
@@ -645,7 +663,7 @@ puts(SV *self_sv, SV *data)
   CODE:
     mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
     if (mg == NULL)
-        croak("puts: called out of context in _xs_scan.");
+        croak("puts: forgot _xs_alloc!");
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     data_body = SvPV(data, data_size);
     creolize_put_blank(self, data_body, data_size);
@@ -661,7 +679,7 @@ put_xml(SV *self_sv, SV *data)
   CODE:
     mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
     if (mg == NULL)
-        croak("put_xml: called out of context in _xs_scan.");
+        croak("put_xml: forgot _xs_alloc!");
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     data_body = SvPV(data, data_size);
     creolize_put_xml(self, data_body, data_size);
@@ -677,7 +695,7 @@ put_raw(SV *self_sv, SV *data)
   CODE:
     mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
     if (mg == NULL)
-        croak("put_raw: called out of context in _xs_scan.");
+        croak("put_raw: forgot _xs_alloc!");
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     if (self->blank)
         sv_catpvn(self->result, " ", 1);
@@ -701,7 +719,7 @@ _put_markup_string(SV *self_sv, SV *markup_string, SV *markup_type)
   CODE:
     mg = mg_find(SvRV(self_sv), PERL_MAGIC_ext);
     if (mg == NULL)
-        croak("_put_markup_string: called out of context in _xs_scan.");
+        croak("_put_markup_string: forgot _xs_alloc!");
     self = INT2PTR(creolize_t *, SvIV(mg->mg_obj));
     markup_string_body = SvPV(markup_string, markup_string_size);
     markup_type_body = SvPV(markup_type, markup_type_size);

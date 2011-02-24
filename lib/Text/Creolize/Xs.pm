@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.005 2010/09/13 12:46:41Z tociyuki Exp $
-use version; our $VERSION = '0.005';
+# $Id: Xs.pm,v 0.006 2011/02/24 05:54:12Z tociyuki Exp $
+use version; our $VERSION = '0.006';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -68,7 +68,7 @@ my %MARKUP = (
 my @BASE36 = ('0' .. '9', 'a' .. 'z');
 my %XML_SPECIAL = (
     q{&} => q{&amp;}, q{<} => q{&lt;}, q{>} => q{&gt;},
-    q{"} => q{&quot;}, q{'} => q{&#39;},
+    q{"} => q{&quot;}, q{'} => q{&#39;}, q{\\} => q{&#92;},
 );
 my $AMP = qr{(?:[a-zA-Z_][a-zA-Z0-9_]*|\#(?:[0-9]{1,5}|x[0-9a-fA-F]{2,4}))}msx;
 my $S = qr{[\x20\t]}msx;
@@ -220,13 +220,13 @@ sub _put_markup {
 
 sub escape_xml {
     my($self, $data) = @_;
-    $data =~ s{([&<>"'])}{ $XML_SPECIAL{$1} }egmosx;
+    $data =~ s{([&<>"'\\])}{ $XML_SPECIAL{$1} }egmosx;
     return $data;
 }
 
 sub escape_text {
     my($self, $data) = @_;
-    $data =~ s{(?:([<>"'])|\&(?:($AMP);)?)}{
+    $data =~ s{(?:([<>"'\\])|\&(?:($AMP);)?)}{
         $1 ? $XML_SPECIAL{$1} : $2 ? qq{\&$2;} : q{&amp;}
     }egmosx;
     return $data;
@@ -287,7 +287,7 @@ sub _start_h {
     my($self, $data) = @_;
     ($self->{heading}) = $data =~ /\A(={1,6})/mosx;
     # why does utf8::length $self->{result} return always zero?
-    $self->{heading_bytes_pos} = bytes::length $self->{result};
+    $self->{heading_pos} = bytes::length $self->{result};
     return $self->_start_block($self->{heading});
 }
 
@@ -296,9 +296,9 @@ sub _end_h {
     my $mark = delete $self->{heading};
     $self->_end_block($mark);
     return $self if ! defined $self->{toc};
-    my $p = bytes::index $self->{result}, q{<h}, $self->{heading_bytes_pos};
-    return $self if $p < 0;
-    my $text = bytes::substr $self->{result}, $p;
+    my $p = 3 + (bytes::index $self->{result}, q{<h}, $self->{heading_pos});
+    return $self if $p < 3;
+    my $text = bytes::substr $self->{result}, $self->{heading_pos};
     if (utf8::is_utf8($self->{result}) && ! utf8::is_utf8($text)) {
         utf8::decode($text);
     }
@@ -306,7 +306,7 @@ sub _end_h {
     $text =~ s/<.*?>//gmosx;
     return $self if ! $text;
     my $id = 'h' . $self->hash_base36($text);
-    substr $self->{result}, $p + 3, 0, qq{ id="$id"};
+    substr $self->{result}, $p, 0, qq{ id="$id"};
     push @{$self->{tocinfo}}, [length $mark, $id, $text];
     return $self;
 }
@@ -329,8 +329,7 @@ sub _list_toc {
 sub _insert_verbatim {
     my($self, $data) = @_;
     ($data) = $data =~ m/\A\{\{\{\n(.*?)$S*\n\}\}\}\n\z/mosx;
-    $data =~ s/\A\x20\}\}\}/\}\}\}/mosx;
-    $data =~ s/\n\x20\}\}\}/\n\}\}\}/gmosx;
+    $data =~ s/^\x20\}\}\}/\}\}\}/gmosx;
     $self->_put_markup('verbatim', 'stag');
     $self->put_xml($data);
     $self->_put_markup('verbatim', 'etag');
@@ -539,7 +538,10 @@ sub _insert_plugin {
     my $visitor = $self->{plugin_visitor} || $self;
     my($source) = $data =~ m{\A<<$S*(.*?)$S*>>\z}mosx;
     my $plugin = $visitor->visit_plugin($source, $self);
-    if ($plugin && $plugin->{runtime}) {
+    if (! $plugin) {
+        return $self;
+    }
+    if ($plugin->{runtime}) {
         ## no critic qw(Interpolation)
         my $proc= q{$v->_build_plugin($v->visit_plugin('}
             . $self->escape_quote($source)
@@ -657,7 +659,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.005
+0.006
 
 =head1 SYNOPSIS
 
@@ -859,7 +861,7 @@ MIZUTANI Tociyuki  C<< <tociyuki@gmail.com> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 2010, MIZUTANI Tociyuki C<< <tociyuki@gmail.com> >>.
+Copyright (c) 2011, MIZUTANI Tociyuki C<< <tociyuki@gmail.com> >>.
 All rights reserved.
 
 This module is free software; you can redistribute it and/or
