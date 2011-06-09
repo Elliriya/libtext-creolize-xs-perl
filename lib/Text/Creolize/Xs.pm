@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.006 2011/02/24 05:54:12Z tociyuki Exp $
-use version; our $VERSION = '0.006';
+# $Id: Xs.pm,v 0.007 2011/06/09 14:09:46Z tociyuki Exp $
+use version; our $VERSION = '0.007';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -304,7 +304,7 @@ sub _end_h {
     }
     chomp $text;
     $text =~ s/<.*?>//gmosx;
-    return $self if ! $text;
+    return $self if $text =~ m/\A$S*\z/msx;
     my $id = 'h' . $self->hash_base36($text);
     substr $self->{result}, $p, 0, qq{ id="$id"};
     push @{$self->{tocinfo}}, [length $mark, $id, $text];
@@ -438,21 +438,14 @@ sub _start_indent {
 
 sub _insert_indent {
     my($self, $data) = @_;
-    $data =~ s/$S+//mosx;
-    my $level = length $data;
-    while ($self->{indent} > $level) {
-        $self->_put_markup(q{>}, 'etag');
-        --$self->{indent};
+    $data =~ s/$S+//gmosx;
+    my($indent, $level) = ($self->{'indent'}, length $data);
+    my($kind, $step) = $indent < $level ? ('stag', +1) : ('etag', -1);
+    while ($indent != $level) {
+        $self->_put_markup(q{>}, $kind);
+        $indent += $step;
     }
-    if ($self->{indent} < $level) {
-        while ($self->{indent} < $level) {
-            $self->_put_markup(q{>}, 'stag');
-            ++$self->{indent};
-        }
-    }
-    else {
-        $self->{indent} = $level;
-    }
+    $self->{'indent'} = $level;
     return $self;
 }
 
@@ -505,7 +498,7 @@ sub _insert_br { return shift->_put_markup(q{\\\\}, 'tag') }
 # inline nowikis: "{{{...}}}"
 sub _insert_nowiki {
     my($self, $data) = @_;
-    my($text) = $data =~ /\A\{\{\{$S*(.*?)$S*\}\}\}\z/mosx;
+    my($text) = $data =~ /\A... $S*(.*?)$S* ...\z/mosx;
     $self->_put_markup('nowiki', 'stag');
     $self->put_xml($text);
     $self->_put_markup('nowiki', 'etag');
@@ -659,7 +652,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.006
+0.007
 
 =head1 SYNOPSIS
 
