@@ -1,5 +1,8 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.008  Thu Jun 10 01:47:47 2011 UTC
+    ! count signs with tr/// _insert_indent.
+
 0.007  Thu Jun 09 14:09:46 2011 UTC
     ! cleanup code _insert_indent.
     ! skip pushing tocinfo for empty headings.
