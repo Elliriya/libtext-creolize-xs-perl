@@ -1,5 +1,8 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.010  Thu Jun 12 15:11:25 2011 UTC
+    ! shift/unshift instead of pop/push in list and phrase stacks.
+
 0.009  Thu Jun 12 14:38:25 2011 UTC
     ! uses for loop in _insert_indent.
 
