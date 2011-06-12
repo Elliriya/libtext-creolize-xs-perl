@@ -1,5 +1,8 @@
 Revision history for Perl extension Text::CreolizeXs.
 
+0.009  Thu Jun 12 14:38:25 2011 UTC
+    ! uses for loop in _insert_indent.
+
 0.008  Thu Jun 10 01:47:47 2011 UTC
     ! count signs with tr/// _insert_indent.
 

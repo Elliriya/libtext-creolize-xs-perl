@@ -5,8 +5,8 @@ use warnings;
 use Encode qw();
 use Digest::MurmurHash;
 
-# $Id: Xs.pm,v 0.008 2011/06/10 01:47:47Z tociyuki Exp $
-use version; our $VERSION = '0.008';
+# $Id: Xs.pm,v 0.009 2011/06/12 14:38:25Z tociyuki Exp $
+use version; our $VERSION = '0.009';
 
 require XSLoader;
 XSLoader::load('Text::Creolize::Xs', $VERSION);
@@ -438,12 +438,11 @@ sub _start_indent {
 
 sub _insert_indent {
     my($self, $data) = @_;
-    my $indent = $self->{'indent'};
     my $level = $data =~ tr/>:/>:/;
-    my($kind, $step) = $indent < $level ? ('stag', +1) : ('etag', -1);
-    while ($indent != $level) {
+    my $step = $level - $self->{'indent'};
+    my $kind = $step > 0 ? 'stag' : 'etag';
+    for (1 .. abs $step) {
         $self->_put_markup(q{>}, $kind);
-        $indent += $step;
     }
     $self->{'indent'} = $level;
     return $self;
@@ -652,7 +651,7 @@ Text::Creolize::Xs - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.008
+0.009
 
 =head1 SYNOPSIS
 
